@@ -405,6 +405,57 @@ int WiFiClass::ping(IPAddress host, uint8_t ttl)
     return WiFiDrv::ping(host, ttl);
 }
 
+bool WiFiClass::asyncPingSupported()
+{
+    return firmwareVersionU32() >= 0x030002;
+}
+
+WiFiAsyncPingStartResult WiFiClass::pingAsync(IPAddress host, uint8_t ttl,
+                                               uint16_t timeoutMs,
+                                               uint32_t& token)
+{
+    if (!asyncPingSupported()) {
+        return WiFiAsyncPingStartResult::UnsupportedFirmware;
+    }
+    if (ttl == 0 || timeoutMs == 0 || timeoutMs > 5000) {
+        return WiFiAsyncPingStartResult::InvalidArgument;
+    }
+
+    uint8_t status = 0xff;
+    token = 0;
+    if (!WiFiDrv::asyncPingStart(static_cast<uint32_t>(host), ttl, timeoutMs,
+                                 token, status)) {
+        return WiFiAsyncPingStartResult::Error;
+    }
+
+    switch (status) {
+    case 0:
+        return WiFiAsyncPingStartResult::Started;
+    case 1:
+        return WiFiAsyncPingStartResult::Busy;
+    case 2:
+        return WiFiAsyncPingStartResult::InvalidArgument;
+    default:
+        return WiFiAsyncPingStartResult::Error;
+    }
+}
+
+bool WiFiClass::pingAsyncResult(uint32_t token, WiFiAsyncPingResult& result)
+{
+    uint8_t state = 0xff;
+    int16_t rtt = -1;
+    if (token == 0 || !WiFiDrv::asyncPingResult(token, state, rtt)) {
+        return false;
+    }
+    if (state > static_cast<uint8_t>(WiFiAsyncPingState::UnknownToken)) {
+        return false;
+    }
+
+    result.state = static_cast<WiFiAsyncPingState>(state);
+    result.rtt = rtt;
+    return true;
+}
+
 void WiFiClass::setTimeout(unsigned long timeout)
 {
     _timeout = timeout;

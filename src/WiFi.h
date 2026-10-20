@@ -21,7 +21,7 @@
 #ifndef WiFi_h
 #define WiFi_h
 
-#define WIFI_FIRMWARE_LATEST_VERSION "3.0.1"
+#define WIFI_FIRMWARE_LATEST_VERSION "3.0.2"
 #define WIFI_HAS_FEED_WATCHDOG_FUNC
 
 #include <inttypes.h>
@@ -38,6 +38,26 @@ extern "C" {
 #include "WiFiStorage.h"
 
 typedef void(*FeedHostProcessorWatchdogFuncPointer)();
+
+enum class WiFiAsyncPingStartResult : uint8_t {
+    Started,
+    UnsupportedFirmware,
+    Busy,
+    InvalidArgument,
+    Error
+};
+
+enum class WiFiAsyncPingState : uint8_t {
+    Idle = 0,
+    Running = 1,
+    Complete = 2,
+    UnknownToken = 3
+};
+
+struct WiFiAsyncPingResult {
+    WiFiAsyncPingState state;
+    int16_t rtt;
+};
 
 class WiFiClass
 {
@@ -286,6 +306,10 @@ public:
     int ping(const char* hostname, uint8_t ttl = 128);
     int ping(const String &hostname, uint8_t ttl = 128);
     int ping(IPAddress host, uint8_t ttl = 128);
+    bool asyncPingSupported();
+    WiFiAsyncPingStartResult pingAsync(IPAddress host, uint8_t ttl,
+                                       uint16_t timeoutMs, uint32_t& token);
+    bool pingAsyncResult(uint32_t token, WiFiAsyncPingResult& result);
 
     void setTimeout(unsigned long timeout);
 

@@ -1069,6 +1069,88 @@ int16_t WiFiDrv::ping(uint32_t ipAddress, uint8_t ttl)
     return _data;
 }
 
+bool WiFiDrv::asyncPingStart(uint32_t ipAddress, uint8_t ttl,
+                             uint16_t timeoutMs, uint32_t& token,
+                             uint8_t& status)
+{
+    uint8_t timeout[2] = {
+        static_cast<uint8_t>(timeoutMs >> 8),
+        static_cast<uint8_t>(timeoutMs)
+    };
+
+    WAIT_FOR_SLAVE_SELECT();
+    SpiDrv::sendCmd(START_ASYNC_PING_CMD, PARAM_NUMS_3);
+    SpiDrv::sendParam((uint8_t*)&ipAddress, sizeof(ipAddress), NO_LAST_PARAM);
+    SpiDrv::sendParam(&ttl, sizeof(ttl), NO_LAST_PARAM);
+    SpiDrv::sendParam(timeout, sizeof(timeout), LAST_PARAM);
+
+    // Keep the transfer aligned after the final-parameter marker.
+    SpiDrv::readChar();
+    SpiDrv::readChar();
+
+    SpiDrv::spiSlaveDeselect();
+    SpiDrv::waitForSlaveReady();
+    SpiDrv::spiSlaveSelect();
+
+    uint8_t tokenBytes[4] = {0, 0, 0, 0};
+    tParam params[PARAM_NUMS_2] = {
+        {0, (char*)&status},
+        {0, (char*)tokenBytes}
+    };
+    const bool received =
+        SpiDrv::waitResponseParams(START_ASYNC_PING_CMD, PARAM_NUMS_2, params);
+    SpiDrv::spiSlaveDeselect();
+    if (!received || params[0].paramLen != 1 ||
+        params[1].paramLen != sizeof(tokenBytes)) {
+        return false;
+    }
+
+    token = ((uint32_t)tokenBytes[0] << 24) |
+            ((uint32_t)tokenBytes[1] << 16) |
+            ((uint32_t)tokenBytes[2] << 8) | tokenBytes[3];
+    return true;
+}
+
+bool WiFiDrv::asyncPingResult(uint32_t token, uint8_t& state, int16_t& rtt)
+{
+    uint8_t tokenBytes[4] = {
+        static_cast<uint8_t>(token >> 24),
+        static_cast<uint8_t>(token >> 16),
+        static_cast<uint8_t>(token >> 8),
+        static_cast<uint8_t>(token)
+    };
+
+    WAIT_FOR_SLAVE_SELECT();
+    SpiDrv::sendCmd(GET_ASYNC_PING_CMD, PARAM_NUMS_1);
+    SpiDrv::sendParam(tokenBytes, sizeof(tokenBytes), LAST_PARAM);
+
+    // Keep the transfer aligned after the final-parameter marker.
+    SpiDrv::readChar();
+    SpiDrv::readChar();
+    SpiDrv::readChar();
+
+    SpiDrv::spiSlaveDeselect();
+    SpiDrv::waitForSlaveReady();
+    SpiDrv::spiSlaveSelect();
+
+    uint8_t rttBytes[2] = {0, 0};
+    tParam params[PARAM_NUMS_2] = {
+        {0, (char*)&state},
+        {0, (char*)rttBytes}
+    };
+    const bool received =
+        SpiDrv::waitResponseParams(GET_ASYNC_PING_CMD, PARAM_NUMS_2, params);
+    SpiDrv::spiSlaveDeselect();
+    if (!received || params[0].paramLen != 1 ||
+        params[1].paramLen != sizeof(rttBytes)) {
+        return false;
+    }
+
+    const uint16_t wireRtt = ((uint16_t)rttBytes[0] << 8) | rttBytes[1];
+    rtt = static_cast<int16_t>(wireRtt);
+    return true;
+}
+
 void WiFiDrv::debug(uint8_t on)
 {
     WAIT_FOR_SLAVE_SELECT();

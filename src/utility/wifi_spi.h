@@ -82,6 +82,8 @@ enum {
     SEND_DATA_TCP_CMD        = 0x44,
     GET_DATABUF_TCP_CMD      = 0x45,
     INSERT_DATABUF_CMD       = 0x46,
+    START_ASYNC_PING_CMD     = 0x48,
+    GET_ASYNC_PING_CMD       = 0x49,
 
 	BLE_BEGIN 				= 0x4A,
 	BLE_END 				= 0x4B,

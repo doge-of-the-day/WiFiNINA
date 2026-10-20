@@ -296,6 +296,11 @@ public:
 
 
     static int16_t ping(uint32_t ipAddress, uint8_t ttl);
+    static bool asyncPingStart(uint32_t ipAddress, uint8_t ttl,
+                               uint16_t timeoutMs, uint32_t& token,
+                               uint8_t& status);
+    static bool asyncPingResult(uint32_t token, uint8_t& state,
+                                int16_t& rtt);
 
     static void debug(uint8_t on);
     static float getTemperature();
